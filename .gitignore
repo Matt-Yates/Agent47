@@ -5,7 +5,7 @@ build/
 dist/
 wheels/
 *.egg-info
-
+.gitignore
 .env
 # Virtual environments
 .venv
