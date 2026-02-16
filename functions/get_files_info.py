@@ -1,4 +1,7 @@
 import os
+from google import genai
+from google.genai import types
+
 
 schema_get_files_info = types.FunctionDeclaration(
     name="get_files_info",
