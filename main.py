@@ -3,6 +3,9 @@ from dotenv import load_dotenv
 from google import genai
 import argparse
 from google.genai import types
+from prompts import system_prompt
+from call_function import available_functions
+
 
 def main():
 
@@ -15,17 +18,28 @@ def main():
     messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]       
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
+    config=types.GenerateContentConfig(
+        tools=[available_functions], 
+        system_instruction=system_prompt
+    )
     client = genai.Client(api_key = api_key)
     response = client.models.generate_content(
         model='gemini-2.5-flash', 
-        contents=messages)
+        contents=messages,
+        config=config,
+        )
+
     tokens = ("Prompt tokens: " + str(response.usage_metadata.prompt_token_count) + "\nResponse tokens: " + str(response.usage_metadata.candidates_token_count))
     if args.verbose:
         
         print("User prompt: " + args.user_prompt)
         print(tokens)
-
-    print(response.text)
+    
+    if response.function_calls:
+        for call in response.function_calls:
+            print(f"Calling function: {call.name}({call.args})")
+    else:
+        print(response.text)
 
 
 
