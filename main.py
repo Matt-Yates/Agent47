@@ -6,7 +6,7 @@ from google.genai import types
 from prompts import system_prompt
 from call_function import available_functions
 from call_function import call_function
-
+import sys
 
 def main():
 
@@ -24,33 +24,45 @@ def main():
         system_instruction=system_prompt
     )
     client = genai.Client(api_key = api_key)
-    response = client.models.generate_content(
-        model='gemini-2.5-flash', 
-        contents=messages,
-        config=config,
-        )
-    
-    tokens = ("Prompt tokens: " + str(response.usage_metadata.prompt_token_count) + "\nResponse tokens: " + str(response.usage_metadata.candidates_token_count))
     if args.verbose:
         
         print("User prompt: " + args.user_prompt)
         print(tokens)
 
-    
-    if response.function_calls:
-        for call in response.function_calls:
-            function_call_result = call_function(call, args.verbose)
-            if not function_call_result.parts:
-                raise Exception("No parts in function call result")
-            if not function_call_result.parts[0].function_response:
-                raise Exception("No function response object")
-            if not function_call_result.parts[0].function_response.response:
-                raise Exception("No function result present")
+    #Primary feedback loop
+    for _ in range(20):
+        response = client.models.generate_content(
+            model='gemini-2.5-flash', 
+            contents=messages,
+            config=config,
+            )
+        if response.candidates:
+            for item in response.candidates:
+                messages.append(item.content)
 
-            function_results.append(function_call_result.parts[0])
+        tokens = ("Prompt tokens: " + str(response.usage_metadata.prompt_token_count) + "\nResponse tokens: " + str(response.usage_metadata.candidates_token_count))
+    
+        if response.function_calls:
+            function_results = []
+            for call in response.function_calls:
+                function_call_result = call_function(call, args.verbose)
+                if not function_call_result.parts:
+                    raise Exception("No parts in function call result")
+                if not function_call_result.parts[0].function_response:
+                    raise Exception("No function response object")
+                if not function_call_result.parts[0].function_response.response:
+                    raise Exception("No function result present")
+
+                function_results.append(function_call_result.parts[0])
         
-            if args.verbose:
-                print(f"-> {function_call_result.parts[0].function_response.response}")
-                
+                if args.verbose:
+                    print(f"-> {function_call_result.parts[0].function_response.response}")
+            messages.append(types.Content(role="user", parts=function_results))
+        else:
+            print(response.text)
+            return
+    sys.exit(1) 
+
+                    
 if __name__ == "__main__":
     main()
